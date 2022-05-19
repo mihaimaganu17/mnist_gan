@@ -302,13 +302,13 @@ def summarize_performance(epoch, generator, discriminator, dataset, latent_size,
     print(">Accuracy real: %.0f%%, fake: %.0f%%" %
             (acc_real*100, acc_fake*100))
     # Save some examples
-    save_plot(x_fake, epoch)
+    save_plot(x_fake, filename="generated_plot_e%03d.png", epoch=epoch)
     # Save the generator model in a file
     filename = 'generator_model_%03d.h5' % (epoch + 1)
     generator.model.save(filename)
 
 
-def save_plot(examples, epoch, n=10):
+def save_plot(examples, filename=None, epoch=None, n=10):
     """
     Function that plots examples
 
@@ -329,17 +329,60 @@ def save_plot(examples, epoch, n=10):
         # Plot raw pixel data
         pyplot.imshow(examples[i, :, :, 0], cmap='gray')
     # save plot to file
-    filename = 'generated_plot_e%03d.png' % (epoch + 1)
+    if epoch:
+        filename = filename % (epoch + 1)
     pyplot.savefig(filename)
     pyplot.close()
 
 
+def generate_mnist(
+        model_file=None,
+        filename="generated_mnist.png",
+        latent_size=100,
+        n_samples=25,
+        grid_size=5
+    ):
+    # Check if a model file has been passed
+    if not model_file:
+        raise Exception("Please provide a file model location. It should be \
+                a *.h5 file")
+    # Generate latent points
+    latent_points = generate_latent_points(latent_size, n_samples)
+    # Load model
+    model = models.load_model(model_file)
+    # Generate new samples by doing a model prediction
+    samples = model.predict(latent_points)
+    # Save the new generated samples
+    save_plot(samples, filename=filename, n=grid_size)
+
+
+
 from dataset import Mnist
+import argparse
+
 
 if __name__ == "__main__":
-    latent_space_size = 100
-    discriminator = Discriminator()
-    generator = Generator(latent_space_size)
-    gan = Gan(generator, discriminator)
-    dataset = Mnist().preprocess_train_data()
-    train(generator, discriminator, gan, dataset, latent_space_size)
+    parser = argparse.ArgumentParser(description="GAN for generating MNIST \
+            hanwritten digits")
+    parser.add_argument("-l", "--latent_size", dest='latent_space_size',
+            action='store', default=100,
+            help="How many latent points we should generate")
+    parser.add_argument("-t", "--train", action="store_true",
+            help="Specify this flag if you want to train the model")
+    parser.add_argument("-g", "--generate", action="store_true",
+            help="Specify this flag if you want to generate MNIST \
+                    hanwritten digits using the model. The results will be \
+                    stored in a filed called `generated_mnist.png`")
+    parser.add_argument("-m", "--model_file", action="store",
+            help="File location where we should load our model from for MNIST \
+                generation. Use this flag with `-g` flag")
+    args = parser.parse_args()
+
+    if args.train:
+        discriminator = Discriminator()
+        generator = Generator(args.latent_space_size)
+        gan = Gan(generator, discriminator)
+        dataset = Mnist().preprocess_train_data()
+        train(generator, discriminator, gan, dataset, args.latent_space_size)
+    elif args.generate:
+        generate_mnist(args.model_file)
